@@ -1,0 +1,132 @@
+include_guard()
+
+set(CH32_FAMILY ch32x035)
+set(SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/vendor_files)
+set(SDK_SRC_DIR ${SDK_DIR})
+
+# include board specific
+include(${CMAKE_CURRENT_LIST_DIR}/boards/${BOARD}/board.cmake)
+
+# toolchain set up
+# CH32X035 core uses fence.i instruction which requires zifencei extension
+set(CMAKE_SYSTEM_CPU rv32imac_zifencei-ilp32 CACHE INTERNAL "System Processor")
+set(CMAKE_TOOLCHAIN_FILE ${TOP}/examples/build_system/cmake/toolchain/riscv_${TOOLCHAIN}.cmake)
+
+set(FAMILY_MCUS CH32X035 CACHE INTERNAL "")
+set(OPENOCD_OPTION "-f ${CMAKE_CURRENT_LIST_DIR}/wch-riscv.cfg")
+
+#------------------------------------
+# Startup & Linker script
+#------------------------------------
+if (NOT DEFINED LD_FILE_GNU)
+set(LD_FILE_GNU ${CMAKE_CURRENT_LIST_DIR}/linker/ch32x035.ld)
+endif ()
+set(LD_FILE_Clang ${LD_FILE_GNU})
+if (NOT DEFINED STARTUP_FILE_GNU)
+set(STARTUP_FILE_GNU ${SDK_SRC_DIR}/Startup/startup_${CH32_FAMILY}.S)
+endif ()
+set(STARTUP_FILE_Clang ${STARTUP_FILE_GNU})
+
+#------------------------------------
+# Board Target
+#------------------------------------
+function(family_add_board BOARD_TARGET)
+  add_library(${BOARD_TARGET} STATIC
+    ${SDK_SRC_DIR}/Core/core_riscv.c
+    ${SDK_SRC_DIR}/Peripheral/src/${CH32_FAMILY}_gpio.c
+    ${SDK_SRC_DIR}/Peripheral/src/${CH32_FAMILY}_misc.c
+    ${SDK_SRC_DIR}/Peripheral/src/${CH32_FAMILY}_rcc.c
+    ${SDK_SRC_DIR}/Peripheral/src/${CH32_FAMILY}_usart.c
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/${CH32_FAMILY}_it.c
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/system_${CH32_FAMILY}.c
+    )
+  target_include_directories(${BOARD_TARGET} PUBLIC
+    ${SDK_SRC_DIR}/Core
+    ${SDK_SRC_DIR}/Peripheral/inc
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
+    )
+  # CH32X035 only has USB Full Speed
+  target_compile_definitions(${BOARD_TARGET} PUBLIC
+    CFG_TUD_WCH_USBIP_USBFS=1
+    )
+  
+  # https://github.com/openwch/ch32v307/pull/90
+  target_compile_options(${BOARD_TARGET} PUBLIC -Wno-error=strict-prototypes)
+
+  update_board(${BOARD_TARGET})
+
+  if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${BOARD_TARGET} PUBLIC
+      -msmall-data-limit=8
+      -mno-save-restore
+      -fmessage-length=0
+      -fsigned-char
+      )
+    
+    # Check if picolibc is available (Ubuntu/Debian riscv64-unknown-elf toolchain)
+    if (EXISTS "/usr/lib/picolibc/riscv64-unknown-elf/include")
+      target_compile_options(${BOARD_TARGET} PUBLIC
+        -isystem /usr/lib/picolibc/riscv64-unknown-elf/include
+        )
+    endif ()
+  endif ()
+endfunction()
+
+#------------------------------------
+# Functions
+#------------------------------------
+function(family_configure_example TARGET RTOS)
+  family_configure_common(${TARGET} ${RTOS})
+  family_add_tinyusb(${TARGET} OPT_MCU_CH32X035)
+
+  target_sources(${TARGET} PUBLIC
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/family.c
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/debug_uart.c
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../board.c
+    ${TOP}/src/portable/wch/dcd_ch32_usbfs.c
+    ${STARTUP_FILE_${CMAKE_C_COMPILER_ID}}
+    )
+  target_include_directories(${TARGET} PUBLIC
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/boards/${BOARD}
+    )
+
+  if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    # Check if picolibc is available (use vendor startup instead of picolibc crt0)
+    if (EXISTS "/usr/lib/picolibc/riscv64-unknown-elf/lib/rv32imac/ilp32")
+      target_link_options(${TARGET} PUBLIC
+        -nostartfiles -nodefaultlibs
+        -L/usr/lib/picolibc/riscv64-unknown-elf/lib/rv32imac/ilp32
+        -L/usr/lib/picolibc/riscv64-unknown-elf/lib
+        -Wl,--defsym=__FLASH_SIZE=${LD_FLASH_SIZE}
+        -Wl,--defsym=__RAM_SIZE=${LD_RAM_SIZE}
+        "LINKER:--script=${LD_FILE_GNU}"
+        )
+      target_link_libraries(${TARGET} PUBLIC c gcc)
+    else ()
+      target_link_options(${TARGET} PUBLIC
+        -nostartfiles
+        --specs=nosys.specs --specs=nano.specs
+        -Wl,--defsym=__FLASH_SIZE=${LD_FLASH_SIZE}
+        -Wl,--defsym=__RAM_SIZE=${LD_RAM_SIZE}
+        "LINKER:--script=${LD_FILE_GNU}"
+        )
+    endif ()
+  elseif (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR "Clang is not supported")
+  elseif (CMAKE_C_COMPILER_ID STREQUAL "IAR")
+    target_link_options(${TARGET} PUBLIC
+      "LINKER:--config=${LD_FILE_IAR}"
+      )
+  endif ()
+
+  set_source_files_properties(${STARTUP_FILE_${CMAKE_C_COMPILER_ID}} PROPERTIES
+    SKIP_LINTING ON
+    COMPILE_OPTIONS -w)
+
+  # Flashing
+  family_add_bin_hex(${TARGET})
+  family_flash_openocd_wch(${TARGET})
+  family_flash_wlink_rs(${TARGET})
+endfunction()

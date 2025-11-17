@@ -97,6 +97,65 @@
 #elif CFG_TUSB_MCU == OPT_MCU_CH32V307
   #include <ch32v30x.h>
   #define USBHD_IRQn OTG_FS_IRQn
+#elif CFG_TUSB_MCU == OPT_MCU_CH32X035
+  #include <ch32x035.h>
+  // CH32X035 has a different register layout
+  // The USBFSD peripheral packs TX_CTRL (low byte) and RX_CTRL (high byte) into CTRL_H
+  // We need to create a compatible structure overlay for the driver
+  typedef struct {
+    __IO uint8_t  BASE_CTRL;
+    __IO uint8_t  UDEV_CTRL;
+    __IO uint8_t  INT_EN;
+    __IO uint8_t  DEV_ADDR;
+    uint8_t       RESERVED0;
+    __IO uint8_t  MIS_ST;
+    __IO uint8_t  INT_FG;
+    __IO uint8_t  INT_ST;
+    __IO uint32_t RX_LEN;
+    __IO uint8_t  UEP4_1_MOD;
+    __IO uint8_t  UEP2_3_MOD;
+    union {
+      __IO uint8_t  UEP5_6_MOD;  // For compatibility with other CH32 MCUs
+      __IO uint8_t  UEP7_MOD;    // Alias, CH32X035 has UEP567_MOD which controls EP5/6/7
+    };
+    uint8_t       RESERVED1;
+    __IO uint32_t UEP0_DMA;
+    __IO uint32_t UEP1_DMA;
+    __IO uint32_t UEP2_DMA;
+    __IO uint32_t UEP3_DMA;
+    __IO uint16_t UEP0_TX_LEN;
+    __IO uint8_t  UEP0_TX_CTRL;  // Low byte of CTRL_H
+    __IO uint8_t  UEP0_RX_CTRL;  // High byte of CTRL_H
+    __IO uint16_t UEP1_TX_LEN;
+    __IO uint8_t  UEP1_TX_CTRL;
+    __IO uint8_t  UEP1_RX_CTRL;
+    __IO uint16_t UEP2_TX_LEN;
+    __IO uint8_t  UEP2_TX_CTRL;
+    __IO uint8_t  UEP2_RX_CTRL;
+    __IO uint16_t UEP3_TX_LEN;
+    __IO uint8_t  UEP3_TX_CTRL;
+    __IO uint8_t  UEP3_RX_CTRL;
+    __IO uint16_t UEP4_TX_LEN;
+    __IO uint8_t  UEP4_TX_CTRL;
+    __IO uint8_t  UEP4_RX_CTRL;
+    uint32_t      RESERVED2[8];
+    __IO uint32_t UEP5_DMA;
+    __IO uint32_t UEP6_DMA;
+    __IO uint32_t UEP7_DMA;
+    uint32_t      RESERVED3;
+    __IO uint16_t UEP5_TX_LEN;
+    __IO uint8_t  UEP5_TX_CTRL;
+    __IO uint8_t  UEP5_RX_CTRL;
+    __IO uint16_t UEP6_TX_LEN;
+    __IO uint8_t  UEP6_TX_CTRL;
+    __IO uint8_t  UEP6_RX_CTRL;
+    __IO uint16_t UEP7_TX_LEN;
+    __IO uint8_t  UEP7_TX_CTRL;
+    __IO uint8_t  UEP7_RX_CTRL;
+  } USBOTG_FS_TypeDef;
+
+  #define USBOTG_FS ((USBOTG_FS_TypeDef *) USBFS_BASE)
+  #define USBHD_IRQn USBFS_IRQn
 #endif
 
 #ifdef __GNUC__
