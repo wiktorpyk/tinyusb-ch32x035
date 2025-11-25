@@ -5,7 +5,10 @@
 #CROSS_COMPILE ?= riscv-nuclei-elf-
 
 # Toolchain from https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack
-CROSS_COMPILE ?= riscv-none-elf-
+#CROSS_COMPILE ?= riscv-none-elf-
+
+# Ubuntu/Debian riscv64-unknown-elf toolchain
+CROSS_COMPILE ?= riscv64-unknown-elf-
 
 CH32_FAMILY = ch32x035
 SDK_DIR = hw/mcu/wch/ch32x035
