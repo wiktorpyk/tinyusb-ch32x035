@@ -1,8 +1,8 @@
 include_guard()
 
 set(CH32_FAMILY ch32x035)
-set(SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/vendor_files)
-set(SDK_SRC_DIR ${SDK_DIR})
+set(SDK_DIR "${TOP}/hw/mcu/wch/ch32x035")
+set(SDK_SRC_DIR "${SDK_DIR}/EVT/EXAM/SRC")
 
 # include board specific
 include(${CMAKE_CURRENT_LIST_DIR}/boards/${BOARD}/board.cmake)

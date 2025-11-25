@@ -81,6 +81,7 @@ static void update_in(uint8_t rhport, uint8_t ep, bool force) {
 
       EP_TX_LEN(ep) = len;
       if (ep == 0) {
+        // EP0 manual toggle per datasheet - T_TOG is bit 6
         EP_TX_CTRL(0) = USBFS_EP_T_RES_ACK | (data.ep0_tog ? USBFS_EP_T_TOG : 0);
         data.ep0_tog = !data.ep0_tog;
       } else if (data.isochronous[ep]) {
@@ -125,8 +126,8 @@ static void update_out(uint8_t rhport, uint8_t ep, size_t rx_len) {
 /* public functions */
 bool dcd_init(uint8_t rhport, const tusb_rhport_init_t* rh_init) {
   (void) rh_init;
-  // init registers
-  USBOTG_FS->BASE_CTRL = USBFS_CTRL_SYS_CTRL | USBFS_CTRL_INT_BUSY | USBFS_CTRL_DMA_EN;
+  // init registers per datasheet section 18.2.1.1
+  USBOTG_FS->BASE_CTRL = USBFS_CTRL_INT_BUSY | USBFS_CTRL_DMA_EN;
   USBOTG_FS->UDEV_CTRL = USBFS_UDEV_CTRL_PD_DIS | USBFS_UDEV_CTRL_PORT_EN;
   USBOTG_FS->DEV_ADDR = 0x00;
 
@@ -142,8 +143,7 @@ bool dcd_init(uint8_t rhport, const tusb_rhport_init_t* rh_init) {
   // enable other endpoints but NAK everything
   USBOTG_FS->UEP4_1_MOD = 0xCC;
   USBOTG_FS->UEP2_3_MOD = 0xCC;
-  USBOTG_FS->UEP5_6_MOD = 0xCC;
-  USBOTG_FS->UEP7_MOD = 0x0C;
+  USBOTG_FS->UEP567_MOD = 0xCC;
 
   for (uint8_t ep = 1; ep < EP_MAX; ep++) {
     EP_DMA(ep) = (uint32_t) &data.buffer[ep][0];
@@ -228,12 +228,14 @@ void dcd_remote_wakeup(uint8_t rhport) {
 
 void dcd_connect(uint8_t rhport) {
   (void) rhport;
-  USBOTG_FS->BASE_CTRL |= USBFS_CTRL_DEV_PUEN;
+  // Enable USB device physical port per datasheet section 18.2.2.1
+  USBOTG_FS->UDEV_CTRL |= USBFS_UDEV_CTRL_PORT_EN;
 }
 
 void dcd_disconnect(uint8_t rhport) {
   (void) rhport;
-  USBOTG_FS->BASE_CTRL &= ~USBFS_CTRL_DEV_PUEN;
+  // Disable USB device physical port
+  USBOTG_FS->UDEV_CTRL &= ~USBFS_UDEV_CTRL_PORT_EN;
 }
 
 void dcd_sof_enable(uint8_t rhport, bool en) {
