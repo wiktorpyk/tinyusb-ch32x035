@@ -34,16 +34,16 @@
  extern "C" {
 #endif
 
-#define LED_PORT              GPIOA
-#define LED_PIN               GPIO_Pin_15
-#define LED_STATE_ON          0
-#define LED_CLOCK_EN()        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE)
+#define LED_PORT              GPIOB
+#define LED_PIN               GPIO_Pin_12
+#define LED_STATE_ON          1
+#define LED_CLOCK_EN()        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE)
 
-// No button on EVT board by default
-// #define BUTTON_PORT           GPIOA
-// #define BUTTON_PIN            GPIO_Pin_0
+// Button on PC17
+// #define BUTTON_PORT           GPIOC
+// #define BUTTON_PIN            GPIO_Pin_17
 // #define BUTTON_STATE_ACTIVE   0
-// #define BUTTON_CLOCK_EN()     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE)
+// #define BUTTON_CLOCK_EN()     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE)
 
 #ifdef __cplusplus
  }
